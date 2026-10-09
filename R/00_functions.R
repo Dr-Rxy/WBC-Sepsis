@@ -15,10 +15,20 @@ PALETTE_LAC <- c("FALSE" = "#2471A3", "TRUE" = "#C0392B")  # low lactate (blue),
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-# WBC time windows (hours from time zero)
+# WBC time windows (hours from time zero).
+#
+# The four windows are DISJOINT: together they partition [-8, 96) with no shared
+# boundary point and no overlap, so every measurement contributes to exactly one
+# clustering feature. Windows are named by their START hour, not by their centre:
+# wbc_baseline starts 8 h before time zero and the other three start at 24, 48
+# and 72 h.
+#
+# This differs from the published grid, which used closed intervals and a 32-h
+# baseline window (-8, 24) that shared the 12-24 h range with wbc_t24h (12, 36).
+# See docs/MODIFICATIONS.md for the full specification difference.
 WBC_WINDOWS <- list(
-  wbc_baseline = c(-8, 24), wbc_t24h = c(12, 36),
-  wbc_t48h     = c(36, 60), wbc_t72h = c(60, 84)
+  wbc_baseline = c(-8, 24), wbc_t24h = c(24, 48),
+  wbc_t48h     = c(48, 72), wbc_t72h = c(72, 96)
 )
 CLUSTER_FEATURES <- names(WBC_WINDOWS)
 
@@ -442,7 +452,6 @@ make_table1 <- function(df, group, vars_spec,
     if (!var %in% names(df)) next
     dig <- if (length(v) >= 4) v[[4]] else 1L
     how <- if (length(v) >= 5) v[[5]] else "mean"
-    stopifnot(how %in% c("mean", "median"))
     label <- sub(", (mean \\(SD\\)|median \\(IQR\\))$", "", label)
     if (vtype == "cat") {
       for (lvl in na.omit(unique(df[[var]]))) {

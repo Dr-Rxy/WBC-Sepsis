@@ -61,7 +61,10 @@ CREATE INDEX ON tmp_nw_wbc_long (stay_id);
 CREATE INDEX ON tmp_nw_wbc_long (hrs_from_tz);
 
 -- PHASE 4: WBC window features (same 4 windows as MIMIC + eICU)
--- WBC windows (hrs from time_zero): [-8,24) [12,36) [36,60) [60,84)
+-- V3 disjoint grid (hrs from time_zero): [-8,24) [24,48) [48,72) [72,96),
+-- named by START hour; half-open, so the four windows partition the timeline and
+-- no measurement enters two features. The published grid used [-8,24) [12,36)
+-- [36,60) [60,84). See docs/MODIFICATIONS.md.
 DROP TABLE IF EXISTS tmp_nw_wbc_features;
 CREATE TEMP TABLE tmp_nw_wbc_features AS
 SELECT
@@ -72,11 +75,11 @@ SELECT
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY wbc)
         FILTER (WHERE hrs_from_tz >= -8  AND hrs_from_tz < 24)  AS wbc_baseline,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY wbc)
-        FILTER (WHERE hrs_from_tz >= 12 AND hrs_from_tz < 36)  AS wbc_t24h,
+        FILTER (WHERE hrs_from_tz >= 24 AND hrs_from_tz < 48)  AS wbc_t24h,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY wbc)
-        FILTER (WHERE hrs_from_tz >= 36 AND hrs_from_tz < 60)  AS wbc_t48h,
+        FILTER (WHERE hrs_from_tz >= 48 AND hrs_from_tz < 72)  AS wbc_t48h,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY wbc)
-        FILTER (WHERE hrs_from_tz >= 60 AND hrs_from_tz < 84)  AS wbc_t72h
+        FILTER (WHERE hrs_from_tz >= 72 AND hrs_from_tz < 96)  AS wbc_t72h
 FROM tmp_nw_wbc_long
 GROUP BY stay_id;
 CREATE INDEX ON tmp_nw_wbc_features (stay_id);
