@@ -462,14 +462,37 @@ n_total <- nrow(df); n_c1 <- sum(df$km_class == 1); n_c2 <- sum(df$km_class == 2
 strobe_cnt <- fread(file.path(PROJECT_ROOT, "data", "mimic_strobe_counts.csv"))
 cat(sprintf("STROBE step 1 (ICU admissions): %s\n",
             format(strobe_cnt$step1_icu_admissions, big.mark = ",")))
+# 改动 122（2026-10-17）：新增 `Excluded_reason` —— 相对上一行剔除的人数**及其原因**。
+# 原来只给计数，而 STROBE 条目 13(b) 要求逐阶段说明未纳入原因；补充表 S1 与图 1 右列同源，
+# 原因必须落在表里。同时修正一处错标：原第 5 行 "After excluding hematologic malignancy,
+# HIV, solid organ transplant" 右侧是 27,963，那是**排除后剩余**，真正剔除的 4,222 就在它
+# 旁边的剔除框里，两个数互相矛盾。
+#
+# 改动 123（2026-10-17）：**`Step` 一律写「人群状态」，不写纳入标准**。122 版把左列写成
+# "Sepsis-3 criteria met"、"Age >= 18 years, first ICU admission, ICU stay >= 1 day" 这类标准，
+# 于是每一行都与右侧剔除框构成「肯定句 + 否定句」的镜像 —— 第 3 行左右两侧就是同一句话的
+# 正反两面，同一件事写了两遍，读起来别扭。CONSORT 模板左列只有阶段/人群（`Assessed for
+# eligibility` / `Randomised` / `Analysed`），标准只出现在右侧 `Excluded (n=)` 框里；本地
+# 文献里与本稿最接近的 MIMIC-IV WBC 轨迹流程图（Mediators Inflamm 2026）左列也只写人群。
+# 左列只写人群状态，标准因此只出现一次，且紧挨着它的计数。
+#
+# 改动 124（2026-10-17）：**左列再收到只剩名称**。123 版仍写着 `Adult first-admission
+# cohort, ICU stay >= 1 day`、`Cohort with a valid time zero`、`Cohort free of exclusion
+# criteria` —— 名称里还挂着条件，而这三条在右列都有自己的否定式，等于把同一件事说了一半
+# 又一半。取舍原则现在是：
+#   ① 左列 = 人群状态名，名称里不挂任何筛选条件；
+#   ② 唯一例外是**起点人群的范围描述**（图 S1 的 "208 hospitals"），它界定分母，不是筛选；
+#   ③ 筛选条件全部归右列剔除框（STROBE 条目 13(b)）；
+#   ④ 若某条件因步骤合并而在图上失去落点，移进该步的**剔除原因**，而不是塞回左列标签
+#      （图 S2 的年龄/留观即如此，见该段注释）。
+# 改后图 1 最长左行由 2.24 in 降到 1.66 in，三张图 15 行全部在 1.66 in 以内。
 strobe <- data.table(
   Step = c("MIMIC-IV v3.1 ICU admissions",
-    "Sepsis-3 criteria met (suspected infection + SOFA >= 2)",
-    "Age >= 18 years, first ICU stay, LOS >= 1 day",
-    "Valid time zero (antibiotic/infection window)",
-    "Excluded: hematologic malignancy, HIV, solid organ transplant",
-    "WBC baseline measurement available",
-    "FINAL ANALYTIC COHORT",
+    "Sepsis-3 cohort",
+    "Adult first ICU admissions",
+    "Time zero assigned",
+    "Post-exclusion cohort",
+    "Analytic cohort",
     "  C1 high-WBC subgroup",
     "  C2 normal-WBC subgroup"),
   n = c(format(strobe_cnt$step1_icu_admissions, big.mark=","),
@@ -477,9 +500,16 @@ strobe <- data.table(
     format(strobe_cnt$step3_age_first_los, big.mark=","),
     format(strobe_cnt$step4_time_zero, big.mark=","),
     format(strobe_cnt$step5_excluded, big.mark=","),
-    sprintf("%d", n_total), sprintf("%d", n_total),
+    sprintf("%d", n_total),
     sprintf("%d (%.1f%%)", n_c1, n_c1 / n_total * 100),
-    sprintf("%d (%.1f%%)", n_c2, n_c2 / n_total * 100)))
+    sprintf("%d (%.1f%%)", n_c2, n_c2 / n_total * 100)),
+  Excluded_reason = c("",
+    "Did not meet the Sepsis-3 criteria",
+    "Age < 18 years, repeat ICU admission, or ICU stay < 1 day",
+    "No time zero within the 24 h before to 72 h after suspected infection",
+    "Haematological malignancy, HIV infection, or solid organ transplantation",
+    "No WBC measurement from 8 h before to 24 h after time zero",
+    "", ""))
 fwrite(strobe, file.path(TABLES, "table0_strobe_flow.csv"))
 cat("Table 0: STROBE flow written\n")
 
@@ -1074,19 +1104,27 @@ safe({
 
 # eICU STROBE flow; steps 1-4 from data/eicu_strobe_counts.csv (written by sql/02_eicu.sql)
 eicu_strobe_cnt <- fread(file.path(PROJECT_ROOT, "data", "eicu_strobe_counts.csv"))
+# 改动 122：口径与图 1 统一，并补上行间剔除原因。改动 123/124：左列只写人群状态名。
+# 末行仍用 n_eicu_wbc 而非
+# eicu_strobe_cnt$step6_wbc_final —— 后者来自 sql/02_eicu.sql 里那段**平行**计数
+# （es_s5/es_s6），它没有照搬 eicu_time_zero 的 COALESCE(..., 0) 回退，于是把没有
+# 抗生素记录的病人全丢掉，得到 5,600 而非 21,781（补充方法 S1 记录了这一分歧）。
 eicu_strobe <- data.table(
-  Step = c("eICU-CRD v2.0 ICU stays (208 hospitals)",
-           "Age >= 18 years",
-           "ICU length of stay >= 24 hours",
-           "Sepsis diagnosis (ICD-9/diagnosis string)",
-           "Has WBC measurements (analytic cohort)",
-           "FINAL eICU VALIDATION COHORT"),
+  Step = c("eICU-CRD ICU admissions (208 hospitals)",
+           "Adult ICU admissions",
+           "ICU stays ≥ 24 hours",
+           "Sepsis cohort",
+           "Analytic cohort"),
   n = c(sprintf("%d", eicu_strobe_cnt$step1_icu_stays),
         sprintf("%d", eicu_strobe_cnt$step2_age18),
         sprintf("%d", eicu_strobe_cnt$step3_los24h),
         sprintf("%d", eicu_strobe_cnt$step4_sepsis),
-        sprintf("%d", n_eicu_wbc),
-        sprintf("%d", n_eicu_wbc)))
+        sprintf("%d", n_eicu_wbc)),
+  Excluded_reason = c("",
+        "Age < 18 years or not recorded",
+        "ICU stay < 24 hours",
+        "No sepsis-related diagnostic keyword or ICD code",
+        "No WBC measurement from 8 h before to 96 h after time zero"))
 fwrite(eicu_strobe, file.path(TABLES, "tableS_strobe_eicu.csv"))
 cat("-> tableS_strobe_eicu.csv written\n")
 
@@ -1545,15 +1583,30 @@ cat(sprintf("NWICU:  K=2, Silhouette=%.3f, n=%d\n",
 
 # NWICU STROBE flow; counts from data/nwicu_strobe_counts.csv (written by sql/03_nwicu.sql)
 nw_cnt <- fread(file.path(PROJECT_ROOT, "data", "nwicu_strobe_counts.csv"))
+# 改动 122：原来只有 4 行，隐去了 step3（年龄/LOS）与 step4（时间零点），而第 2 行的
+# 标签却声称包含 step3 的条件；同时补上每步的 `Excluded_reason`（STROBE 条目 13(b)）。
+# 改动 122b：把 `Age >= 18 years, ICU stay >= 1 day, antibiotic time zero` 并进上一行。
+# 依据是 SQL 侧的相等关系（sql/03_nwicu.sql）：st_s2 是 Angus 队列、st_s3 加年龄与 LOS、
+# st_s4 加首个静脉抗生素时间零点，三者都是 4,992 —— 后两步一个人都没剔除。而本项目既有
+# 约定是同一数字不出两框（改动 85）。年龄与 ICU 留观条件因此失去落点，按改动 124 的取舍
+# 原则移进该步的**剔除原因**（`Not in the Angus sepsis cohort (age ≥ 18 years,
+# ICU stay ≥ 1 day)`，实测 2.61 in，单行），而不是塞回左列标签；时间零点由图 S2 下一行
+# `WBC measured in the time-zero window` 承载。下面的 stopifnot 守住这个前提。
+stopifnot(nw_cnt$step2_angus_sepsis == nw_cnt$step3_age_los,
+          nw_cnt$step3_age_los == nw_cnt$step4_time_zero)
 nwicu_strobe <- data.table(
-  Step = c("NWICU v0.1.0 ICU stays",
-           "Angus sepsis cohort (age >= 18, ICU LOS >= 1 day)",
-           "Has WBC in extraction window (-24 to +120 h)",
-           "FINAL NWICU VALIDATION COHORT (baseline WBC available)"),
+  Step = c("NWICU ICU admissions",
+           "Angus sepsis cohort",
+           "WBC measured in the time-zero window",
+           "Analytic cohort"),
   n = c(sprintf("%d", nw_cnt$step1_icu_stays),
         sprintf("%d", nw_cnt$step2_angus_sepsis),
         sprintf("%d", nw_cnt$step5_wbc_any_window),
-        sprintf("%d", nw_cnt$step6_wbc_baseline_final)))
+        sprintf("%d", nw_cnt$step6_wbc_baseline_final)),
+  Excluded_reason = c("",
+        "Not in the Angus sepsis cohort (age ≥ 18 years, ICU stay ≥ 1 day)",
+        "No WBC measurement from 24 h before to 120 h after time zero",
+        "No WBC measurement from 8 h before to 24 h after time zero"))
 fwrite(nwicu_strobe, file.path(TABLES, "tableS14_strobe_nwicu.csv"))
 cat("-> tableS14_strobe_nwicu.csv written\n")
 

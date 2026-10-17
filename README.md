@@ -46,6 +46,20 @@ outside the extraction range.
 > sizes and every effect estimate differ between the two grids, so the earlier revision does
 > **not** reproduce the manuscript. Only the current revision does.
 
+## Time zero and the laboratory window
+
+All three cohorts use a single anchor: **time zero is the time of the first intravenous
+antibiotic administration**, with a documented fallback where that time cannot be
+determined (MIMIC-IV uses the Sepsis-3 time of suspected infection, eICU the time of ICU
+admission). Laboratory maxima, lactate included, are taken over **-24 h to +72 h around
+time zero** in every cohort.
+
+> **Note on earlier revisions.** The previous revision took the laboratory maxima over
+> windows anchored on ICU admission, and used different widths in different databases
+> (-8 to +96 h in eICU, to +120 h in NWICU). That put the laboratory values on a different
+> clock from the four clustering windows above. The current revision is the one that
+> reproduces the manuscript.
+
 ## Requirements
 
 - PostgreSQL with the three databases loaded under the schema names used in the SQL files

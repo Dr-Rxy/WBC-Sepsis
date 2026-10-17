@@ -86,9 +86,10 @@ SELECT
 FROM eicu_icu.lab l
 JOIN eicu_sepsis_cohort s ON l.patientunitstayid = s.patientunitstayid
 JOIN eicu_time_zero tz ON s.patientunitstayid = tz.patientunitstayid
+-- Same window and anchor as MIMIC-IV and NWICU: hours from time_zero.
 WHERE LOWER(l.labname) = 'lactate'
   AND l.labresult IS NOT NULL AND l.labresult > 0 AND l.labresult < 30
-  AND (l.labresultoffset - tz.time_zero_min) / 60.0 BETWEEN -8 AND 96;
+  AND (l.labresultoffset - tz.time_zero_min) / 60.0 BETWEEN -24 AND 72;
 
 CREATE INDEX ON eicu_lactate_long (patientunitstayid);
 

@@ -169,15 +169,21 @@ GROUP BY stay_id;
 CREATE INDEX ON tmp_blood_features (stay_id);
 
 -- PHASE 4: Lab aggregates ---------------------------------------------------
+-- Lactate and the other laboratory maxima are taken over time_zero - 24 h to
+-- + 72 h. The published extraction anchored these on ICU admission instead,
+-- which put them on a different clock from the four clustering windows; eICU
+-- and NWICU used yet other widths. All three cohorts now use the same
+-- interval on the same anchor.
 CREATE TEMP TABLE tmp_labs_agg AS
 WITH labs_raw AS (
     SELECT c.stay_id, le.itemid, le.valuenum
     FROM mimiciv_hosp.labevents le
     JOIN tmp_sepsis_cohort c ON le.hadm_id = c.hadm_id
+    JOIN tmp_time_zero    tz ON c.stay_id  = tz.stay_id
     WHERE le.itemid IN (50813,52442,53154,50889,51237,51675,50912,52546,50885,53089,50861,50878,51265,53189)
       AND le.valuenum IS NOT NULL AND le.valuenum > 0
-      AND le.charttime >= c.icu_intime - INTERVAL '24 hours'
-      AND le.charttime <= c.icu_intime + INTERVAL '72 hours'
+      AND le.charttime >= tz.time_zero - INTERVAL '24 hours'
+      AND le.charttime <= tz.time_zero + INTERVAL '72 hours'
 )
 SELECT stay_id,
     MAX(valuenum) FILTER (WHERE itemid IN (50813,52442,53154) AND valuenum < 30)  AS max_lactate,

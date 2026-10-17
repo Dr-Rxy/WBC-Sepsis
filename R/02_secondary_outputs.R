@@ -570,13 +570,20 @@ s6 <- rbind(s6, data.table(
 # computed it, instead of being written out as a literal.
 .youden_raw <- fread(file.path(TABLES, "tableS7b_threshold_subgroups.csv"))[
   Subgroup == "Overall (MIMIC)"]$Youden_cutoff
+# 改动 133（2026-10-17）：表注原先是**一行伪装成数据的行** —— 四句话分别塞进
+# Sensitivity / Specificity / PPV / NPV 四个**数值列**，靠 Panel = "Note" 标出那一行。
+# 后果有二：① 那四列对有疑义的解析器不再是数值列；② Panel 列凭空多出第三个取值
+# "Note"，任何把这支 CSV 转成表格的人都会得到一个「Note 面板」下面挂四行句子。
+# 现改为：四句话移入新增的 `Note` 列，Panel 与全部数值列留空。位置不变（仍紧随
+# 面板 B 之后），文字一字未改，只是不再占用数值列。
 s6 <- rbind(s6, data.table(
-  Panel = "Note", Cohort = "", Stratum = "", n = "",
+  Panel = "", Cohort = "", Stratum = "", n = "",
   AUC = "", Cutoff = "",
-  Sensitivity = "Panel A metrics use WBC > 15.3 (not >=)",
-  Specificity = sprintf("cases exactly at 15.3 (n = %d) fall on the low-risk side", .mimic_eq),
-  PPV = sprintf("Youden optimum at %s", format(.youden_raw, trim = TRUE)),
-  NPV = "Panel B reports mortality and C1 share within the same strata"), fill = TRUE)
+  Sensitivity = "", Specificity = "", PPV = "", NPV = "",
+  Note = c("Panel A metrics use WBC > 15.3 (not >=)",
+           sprintf("cases exactly at 15.3 (n = %d) fall on the low-risk side", .mimic_eq),
+           sprintf("Youden optimum at %s", format(.youden_raw, trim = TRUE)),
+           "Panel B reports mortality and C1 share within the same strata")), fill = TRUE)
 
 fwrite(s6, file.path(TABLES, "tableS6_threshold_validation.csv"))
 cat("-> tableS6_threshold_validation.csv\n"); print(s6)

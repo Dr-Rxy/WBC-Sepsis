@@ -99,9 +99,10 @@ WHERE le.itemid = '100031'                   -- Lactate
   AND le.valuenum !~ '[^0-9.]'
   AND le.valuenum::numeric > 0
   AND le.valuenum::numeric < 100             -- extreme cap
+  -- Same window and anchor as MIMIC-IV and eICU: hours from time_zero.
   AND le.charttime::timestamp
       BETWEEN tz.time_zero - INTERVAL '24 hours'
-      AND tz.time_zero + INTERVAL '120 hours';
+      AND tz.time_zero + INTERVAL '72 hours';
 CREATE INDEX ON tmp_nw_lactate_long (stay_id);
 
 -- Max lactate per stay from raw labevents (itemid 100031, mmol/L), aligned to time_zero.
