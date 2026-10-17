@@ -34,31 +34,9 @@ their **start** hour. Every measurement falls in exactly one window.
 | `wbc_t48h` | `[48, 72)` | 24 h |
 | `wbc_t72h` | `[72, 96)` | 24 h |
 
-The baseline window extends 8 hours backwards so that pre-antibiotic values are included.
-The within-window median of each feature is the clustering input. The extraction range is
-`[-8, 96)` hours. There is deliberately **no separate 96-hour window**: that period is
-already occupied by `wbc_t72h`, so a further window would either overlap it or fall partly
-outside the extraction range.
-
-> **Note on earlier revisions of this repository.** The first commit used a different grid —
-> baseline `[-8, 24]` followed by `[12, 36)`, `[36, 60)`, `[60, 84)`, of which the first pair
-> overlaps — and also defined a separate 84–108 h window. The cohort size, the subgroup
-> sizes and every effect estimate differ between the two grids, so the earlier revision does
-> **not** reproduce the manuscript. Only the current revision does.
-
-## Time zero and the laboratory window
-
-All three cohorts use a single anchor: **time zero is the time of the first intravenous
-antibiotic administration**, with a documented fallback where that time cannot be
-determined (MIMIC-IV uses the Sepsis-3 time of suspected infection, eICU the time of ICU
-admission). Laboratory maxima, lactate included, are taken over **-24 h to +72 h around
-time zero** in every cohort.
-
-> **Note on earlier revisions.** The previous revision took the laboratory maxima over
-> windows anchored on ICU admission, and used different widths in different databases
-> (-8 to +96 h in eICU, to +120 h in NWICU). That put the laboratory values on a different
-> clock from the four clustering windows above. The current revision is the one that
-> reproduces the manuscript.
+Time zero is the first intravenous antibiotic administration, with a documented fallback
+per database where that time is unavailable. Laboratory maxima, lactate included, are
+taken over -24 h to +72 h around time zero in all three cohorts.
 
 ## Requirements
 
