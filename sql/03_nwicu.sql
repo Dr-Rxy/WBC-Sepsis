@@ -132,7 +132,7 @@ GROUP BY tz.stay_id;
 CREATE INDEX ON tmp_nw_abx_features (stay_id);
 
 -- PHASE 7: Assemble final cohort CSV
-\copy (SELECT c.stay_id, c.hadm_id, c.subject_id, c.admission_age AS age, c.gender, c.first_careunit, c.icu_los_days, tz.time_zero, tz.n_abx_drugs, COALESCE(wf.wbc_baseline, wf.wbc_t24h) AS wbc_baseline, wf.wbc_t24h, wf.wbc_t48h, wf.wbc_t72h, wf.n_wbc_measurements AS n_wbc_tp, wf.first_wbc_hrs, wf.last_wbc_hrs, lac.max_lactate, c.max_creatinine, c.has_vaso, c.charlson_score, COALESCE(abx.n_unique_abx, 0) AS n_unique_abx, COALESCE(abx.has_gp_abx, FALSE) AS has_gp_abx, COALESCE(abx.has_gn_abx, FALSE) AS has_gn_abx, COALESCE(abx.has_fungal_abx, FALSE) AS has_fungal_abx, COALESCE(abx.has_broad_abx, FALSE) AS has_broad_abx, COALESCE(abx.anti_mrsa, FALSE) AS anti_mrsa, COALESCE(abx.anti_pseudomonal, FALSE) AS anti_pseudomonal, c.death_28day, c.death_90day, c.deathtime, c.dischtime, c.admission_year FROM tmp_nw_cohort c JOIN tmp_nw_timezero tz ON c.stay_id = tz.stay_id LEFT JOIN tmp_nw_wbc_features wf ON c.stay_id = wf.stay_id LEFT JOIN tmp_nw_abx_features abx ON c.stay_id = abx.stay_id LEFT JOIN tmp_nw_lactate_max lac ON c.stay_id = lac.stay_id WHERE wf.wbc_baseline IS NOT NULL AND tz.time_zero IS NOT NULL ORDER BY c.stay_id) TO 'data/nwicu_cohort.csv' WITH CSV HEADER;
+\copy (SELECT c.stay_id, c.hadm_id, c.subject_id, c.admission_age AS age, c.gender, c.first_careunit, c.icu_los_days, tz.time_zero, tz.n_abx_drugs, COALESCE(wf.wbc_baseline, wf.wbc_t24h) AS wbc_baseline, wf.wbc_t24h, wf.wbc_t48h, wf.wbc_t72h, wf.n_wbc_measurements AS n_wbc_tp, wf.first_wbc_hrs, wf.last_wbc_hrs, lac.max_lactate, c.max_creatinine, c.has_vaso, c.charlson_score, COALESCE(abx.n_unique_abx, 0) AS n_unique_abx, COALESCE(abx.has_gp_abx, FALSE) AS has_gp_abx, COALESCE(abx.has_gn_abx, FALSE) AS has_gn_abx, COALESCE(abx.has_fungal_abx, FALSE) AS has_fungal_abx, COALESCE(abx.has_broad_abx, FALSE) AS has_broad_abx, COALESCE(abx.anti_mrsa, FALSE) AS anti_mrsa, COALESCE(abx.anti_pseudomonal, FALSE) AS anti_pseudomonal, CASE WHEN c.deathtime IS NOT NULL AND c.deathtime >= tz.time_zero AND c.deathtime <= tz.time_zero + INTERVAL '28 days' THEN 1 ELSE 0 END AS death_28day, c.death_90day, c.deathtime, c.dischtime, c.admission_year, CASE WHEN c.deathtime IS NOT NULL AND c.deathtime >= tz.time_zero AND c.deathtime <= tz.time_zero + INTERVAL '28 days' THEN EXTRACT(EPOCH FROM (c.deathtime - tz.time_zero))/86400 ELSE 28.0 END AS surv_time_abx FROM tmp_nw_cohort c JOIN tmp_nw_timezero tz ON c.stay_id = tz.stay_id LEFT JOIN tmp_nw_wbc_features wf ON c.stay_id = wf.stay_id LEFT JOIN tmp_nw_abx_features abx ON c.stay_id = abx.stay_id LEFT JOIN tmp_nw_lactate_max lac ON c.stay_id = lac.stay_id WHERE wf.wbc_baseline IS NOT NULL AND tz.time_zero IS NOT NULL AND NOT (c.deathtime IS NOT NULL AND c.deathtime < tz.time_zero) ORDER BY c.stay_id) TO 'data/nwicu_cohort.csv' WITH CSV HEADER;
 
 -- PHASE 8: Export blood_long CSV (longitudinal format for trajectory plots)
 \copy (SELECT wbc.stay_id, ROUND(wbc.hrs_from_tz::numeric, 2) AS hrs, wbc.wbc FROM tmp_nw_wbc_long wbc WHERE wbc.stay_id IN ( SELECT stay_id FROM tmp_nw_wbc_features WHERE wbc_baseline IS NOT NULL ) ORDER BY wbc.stay_id, wbc.hrs_from_tz) TO 'data/nwicu_blood_long.csv' WITH CSV HEADER;
@@ -216,7 +216,7 @@ JOIN st_wbc_raw w ON w.hadm_id = c.hadm_id::text
 WHERE w.charttime BETWEEN t.tz - INTERVAL '24 hours'
                       AND t.tz + INTERVAL '120 hours';
 
--- ── Step 6 (FINAL): WBC present in the BASELINE window [-8, +24) ───────────
+-- ── Step 6 (FINAL): WBC present in the BASELINE window [-8, +24), no death before time zero ──
 DROP TABLE IF EXISTS st_s6;
 CREATE TEMP TABLE st_s6 AS
 SELECT COUNT(DISTINCT t.stay_id)::int AS n
@@ -224,7 +224,8 @@ FROM st_tz t
 JOIN st_cohort c ON c.stay_id = t.stay_id
 JOIN st_wbc_raw w ON w.hadm_id = c.hadm_id::text
 WHERE w.charttime BETWEEN t.tz - INTERVAL '8 hours'
-                      AND t.tz + INTERVAL '24 hours';
+                      AND t.tz + INTERVAL '24 hours'
+  AND NOT (c.deathtime IS NOT NULL AND c.deathtime < t.tz);
 
 -- -- Funnel (written to disk for the R side to read) ----------------------------
 \copy (SELECT (SELECT n FROM st_s1) AS step1_icu_stays, (SELECT n FROM st_s2) AS step2_angus_sepsis, (SELECT n FROM st_s3) AS step3_age_los, (SELECT n FROM st_s4) AS step4_time_zero, (SELECT n FROM st_s5) AS step5_wbc_any_window, (SELECT n FROM st_s6) AS step6_wbc_baseline_final) TO 'data/nwicu_strobe_counts.csv' CSV HEADER

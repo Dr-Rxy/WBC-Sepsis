@@ -340,9 +340,14 @@ SELECT
     COALESCE(vent.has_vent, FALSE) AS has_vent,
     COALESCE(rrt.has_crrt, FALSE) AS has_crrt,
     COALESCE(vaso.has_vaso, FALSE) AS has_vaso,
-    CASE WHEN i.dod IS NOT NULL AND i.dod <= i.admittime + INTERVAL '28 days'  THEN 1 ELSE 0 END AS death_28day,
-    CASE WHEN i.dod IS NOT NULL AND i.dod <= i.admittime + INTERVAL '365 days' THEN 1 ELSE 0 END AS death_1year,
-    i.dischtime - i.admittime AS hosp_los_interval
+    CASE WHEN i.dod IS NOT NULL AND i.dod >= tz.time_zero::date AND i.dod <= tz.time_zero::date + 28  THEN 1 ELSE 0 END AS death_28day,
+    CASE WHEN i.dod IS NOT NULL AND i.dod >= tz.time_zero::date AND i.dod <= tz.time_zero::date + 365 THEN 1 ELSE 0 END AS death_1year,
+    i.dischtime - i.admittime AS hosp_los_interval,
+    CASE WHEN i.dod IS NOT NULL AND i.dod >= tz.time_zero::date AND i.dod <= tz.time_zero::date + 28
+         THEN CASE WHEN EXTRACT(EPOCH FROM (i.dod::timestamp - tz.time_zero))/86400 <= 0
+                   THEN 0.5
+                   ELSE EXTRACT(EPOCH FROM (i.dod::timestamp - tz.time_zero))/86400 END
+         ELSE 28.0 END AS surv_time_abx
 FROM tmp_sepsis_cohort a
 JOIN tmp_icu           i   ON a.stay_id    = i.stay_id
 JOIN tmp_time_zero     tz  ON a.stay_id    = tz.stay_id
@@ -362,7 +367,8 @@ WHERE i.admission_age >= 18
   AND EXTRACT(EPOCH FROM (tz.time_zero - a.suspected_infection_time)) / 3600 BETWEEN -24 AND 72
   AND NOT COALESCE(ex.excl_hemato, FALSE)
   AND NOT COALESCE(ex.excl_hiv, FALSE)
-  AND NOT COALESCE(ex.excl_transplant, FALSE);
+  AND NOT COALESCE(ex.excl_transplant, FALSE)
+  AND NOT (i.dod IS NOT NULL AND i.dod < tz.time_zero::date);
 CREATE INDEX ON tmp_cohort_merged (stay_id);
 CREATE INDEX ON tmp_cohort_merged (hadm_id);
 CREATE INDEX ON tmp_cohort_merged (subject_id);
@@ -400,7 +406,7 @@ WHERE bf.n_cbc_total >= 3
 CREATE INDEX ON tmp_feature_matrix (stay_id);
 
 -- PHASE 5d: Final export ----------------------------------------------------
-\copy (SELECT f.subject_id, f.stay_id, f.hadm_id, f.admission_age, f.gender, f.race, f.los_icu, f.los_hospital, f.first_icu_stay, f.admission_type, f.admission_location, f.icu_los_days, f.first_careunit, f.sofa_sepsis3, f.apsiii, f.charlson, f.time_zero, f.tz_source, f.has_glycopeptide, f.has_carbapenem, f.has_cephalosporin, f.abx_n_unique, f.has_gram_negative, f.has_gram_positive, f.has_fungal, f.has_fungal_blood, f.has_contaminant, f.n_unique_organisms, f.n_blood_cultures, f.has_vent, f.has_crrt, f.has_vaso, f.hospital_expire_flag, f.death_28day, f.death_1year, f.hosp_los_interval, f.wbc_baseline, f.wbc_t24h, f.wbc_t48h, f.wbc_t72h, f.anc_baseline, f.anc_t24h, f.anc_t48h, f.anc_t72h, f.alc_baseline, f.alc_t24h, f.alc_t48h, f.alc_t72h, f.wbc_delta_24h, f.wbc_delta_48h, f.wbc_delta_72h, f.wbc_pct_24h, f.wbc_pct_72h, f.wbc_slope, f.anc_delta_24h, f.anc_slope, f.alc_delta_24h, f.alc_slope, f.persistent_high_wbc, f.persistent_low_wbc, f.persistent_lymphopenia, f.n_tp_wbc, f.n_cbc_total, f.has_baseline_cbc, COALESCE(sf.sofa_resp, 0) AS sofa_respiration, COALESCE(sf.sofa_coag, 0) AS sofa_coagulation, COALESCE(sf.sofa_liver, 0) AS sofa_liver, COALESCE(sf.sofa_cv, 0) AS sofa_cardiovascular, COALESCE(sf.sofa_cns, 0) AS sofa_cns, COALESCE(sf.sofa_renal, 0) AS sofa_renal, la.max_lactate, la.max_crp, la.max_inr, la.max_creatinine, la.max_bilirubin, la.max_alt, la.max_ast, la.max_platelet FROM tmp_feature_matrix f LEFT JOIN tmp_sofa sf ON f.stay_id = sf.stay_id LEFT JOIN tmp_labs_agg la ON f.stay_id = la.stay_id ORDER BY f.subject_id, f.stay_id ) TO 'data/feature_matrix.csv' WITH CSV HEADER;
+\copy (SELECT f.subject_id, f.stay_id, f.hadm_id, f.admission_age, f.gender, f.race, f.los_icu, f.los_hospital, f.first_icu_stay, f.admission_type, f.admission_location, f.icu_los_days, f.first_careunit, f.sofa_sepsis3, f.apsiii, f.charlson, f.time_zero, f.tz_source, f.has_glycopeptide, f.has_carbapenem, f.has_cephalosporin, f.abx_n_unique, f.has_gram_negative, f.has_gram_positive, f.has_fungal, f.has_fungal_blood, f.has_contaminant, f.n_unique_organisms, f.n_blood_cultures, f.has_vent, f.has_crrt, f.has_vaso, f.hospital_expire_flag, f.death_28day, f.death_1year, f.hosp_los_interval, f.wbc_baseline, f.wbc_t24h, f.wbc_t48h, f.wbc_t72h, f.anc_baseline, f.anc_t24h, f.anc_t48h, f.anc_t72h, f.alc_baseline, f.alc_t24h, f.alc_t48h, f.alc_t72h, f.wbc_delta_24h, f.wbc_delta_48h, f.wbc_delta_72h, f.wbc_pct_24h, f.wbc_pct_72h, f.wbc_slope, f.anc_delta_24h, f.anc_slope, f.alc_delta_24h, f.alc_slope, f.persistent_high_wbc, f.persistent_low_wbc, f.persistent_lymphopenia, f.n_tp_wbc, f.n_cbc_total, f.has_baseline_cbc, COALESCE(sf.sofa_resp, 0) AS sofa_respiration, COALESCE(sf.sofa_coag, 0) AS sofa_coagulation, COALESCE(sf.sofa_liver, 0) AS sofa_liver, COALESCE(sf.sofa_cv, 0) AS sofa_cardiovascular, COALESCE(sf.sofa_cns, 0) AS sofa_cns, COALESCE(sf.sofa_renal, 0) AS sofa_renal, la.max_lactate, la.max_crp, la.max_inr, la.max_creatinine, la.max_bilirubin, la.max_alt, la.max_ast, la.max_platelet, f.surv_time_abx FROM tmp_feature_matrix f LEFT JOIN tmp_sofa sf ON f.stay_id = sf.stay_id LEFT JOIN tmp_labs_agg la ON f.stay_id = la.stay_id ORDER BY f.subject_id, f.stay_id ) TO 'data/feature_matrix.csv' WITH CSV HEADER;
 
 -- Export blood_long.csv -----------------------------------------------------
 \copy (SELECT stay_id, hrs, wbc FROM tmp_blood_aligned WHERE wbc IS NOT NULL ORDER BY stay_id, hrs) TO 'data/blood_long.csv' WITH CSV HEADER

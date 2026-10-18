@@ -5,8 +5,8 @@ Analysis code (SQL and R) for the manuscript:
 > **Risk stratification of sepsis using longitudinal white blood cell trajectories:
 > microbiological differences and multi-database external validation**
 
-Derivation cohort **MIMIC-IV v3.1** (n = 26,369); external validation in **eICU-CRD** and
-**NWICU** (pooled N = 53,074). The analysis identifies two WBC-trajectory subgroups
+Derivation cohort **MIMIC-IV v3.1** (n = 26,367); external validation in **eICU-CRD** and
+**NWICU** (pooled N = 53,070). The analysis identifies two WBC-trajectory subgroups
 (C1 high-WBC vs C2 normal-WBC).
 
 This repository contains analysis code only. No patient-level data are included.
@@ -38,6 +38,11 @@ Time zero is the first intravenous antibiotic administration, with a documented 
 per database where that time is unavailable. Laboratory maxima, lactate included, are
 taken over -24 h to +72 h around time zero in all three cohorts.
 
+The outcome runs on the same clock. A 28-day death is a death on or before the 28th calendar
+day after the day of time zero; survival time is counted from time zero, with a death on that
+same day set to 0.5 days rather than 0; and patients whose death date precedes that day are
+excluded from the cohort.
+
 ## Requirements
 
 - PostgreSQL with the three databases loaded under the schema names used in the SQL files
@@ -65,7 +70,7 @@ Rscript R/02_secondary_outputs.R
 ```
 
 `R/01` must finish before `R/02`. Result tables are written to `output/tables/`.
-Expected cohort sizes: 26,369 (MIMIC-IV) / 21,781 (eICU) / 4,924 (NWICU).
+Expected cohort sizes: 26,367 (MIMIC-IV) / 21,781 (eICU) / 4,922 (NWICU).
 
 ## Data availability
 

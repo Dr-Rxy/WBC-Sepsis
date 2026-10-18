@@ -255,8 +255,8 @@ if (!is.null(t1)) {
 
 cat("\n========== MORTALITY MODELING ==========\n")
 
-df_surv <- df[!is.na(death_28day) & !is.na(icu_los_days)]
-df_surv[, surv_time := pmin(icu_los_days, 28)]
+df_surv <- df[!is.na(death_28day) & !is.na(surv_time_abx)]
+df_surv[, surv_time := surv_time_abx]
 df_surv[, event := death_28day]
 
 # --- Cox regression with PH-assumption test ---
@@ -273,7 +273,7 @@ cat("Table 3 (Cox) computed\n"); print(cox_results)
 
 # --- Time-varying-coefficient Cox sensitivity (addresses the PH violation) ---
 tv_cox <- safe(fit_cox_timevarying(df_surv, term = "km_class",
-  covars = c("age_z", "sex_f", "sofa_z", "charlson_z"), cutpoints = c(7, 14)),
+  covars = c("age_z", "sex_f", "sofa_z", "charlson_z"), cutpoints = 5),
   "cox_timevarying")
 
 # ── Assemble Table 3: Panel A (nested Cox) + Panel B (time-varying HR) ──
@@ -508,7 +508,7 @@ strobe <- data.table(
     "Age < 18 years, repeat ICU admission, or ICU stay < 1 day",
     "No time zero within the 24 h before to 72 h after suspected infection",
     "Haematological malignancy, HIV infection, or solid organ transplantation",
-    "No WBC measurement from 8 h before to 24 h after time zero",
+    "No WBC measurement from 8 h before to 24 h after time zero, or death before time zero (n = 2)",
     "", ""))
 fwrite(strobe, file.path(TABLES, "table0_strobe_flow.csv"))
 cat("Table 0: STROBE flow written\n")
@@ -1606,7 +1606,7 @@ nwicu_strobe <- data.table(
   Excluded_reason = c("",
         "Not in the Angus sepsis cohort (age ≥ 18 years, ICU stay ≥ 1 day)",
         "No WBC measurement from 24 h before to 120 h after time zero",
-        "No WBC measurement from 8 h before to 24 h after time zero"))
+        "No WBC measurement from 8 h before to 24 h after time zero, or death before time zero (n = 2)"))
 fwrite(nwicu_strobe, file.path(TABLES, "tableS14_strobe_nwicu.csv"))
 cat("-> tableS14_strobe_nwicu.csv written\n")
 

@@ -42,8 +42,7 @@ parse_los <- function(x) {
   hms  <- as.numeric(strsplit(parts[3], ":")[[1]])
   days + hms[1]/24 + hms[2]/1440 + hms[3]/86400
 }
-los_days <- sapply(dat$hosp_los_interval, parse_los)
-dat[, time := pmin(los_days, 28)]
+dat[, time := surv_time_abx]
 dat[, event := death_28day]
 dat[, wbc_high := as.integer(wbc_baseline > 15.3)]
 
@@ -264,7 +263,7 @@ parse_los <- function(x) {
   hms  <- as.numeric(strsplit(parts[3], ":")[[1]])
   days + hms[1] / 24 + hms[2] / 1440 + hms[3] / 86400
 }
-f[, t_ev := pmin(sapply(hosp_los_interval, parse_los), 28)]
+f[, t_ev := surv_time_abx]
 f[, ev := death_28day]
 vars <- c("admission_age", "sex_f", "sofa_sepsis3", "charlson",
           "has_vent", "has_vaso", "has_crrt", "immunocompromised",
