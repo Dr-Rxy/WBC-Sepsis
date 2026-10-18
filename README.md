@@ -38,11 +38,6 @@ Time zero is the first intravenous antibiotic administration, with a documented 
 per database where that time is unavailable. Laboratory maxima, lactate included, are
 taken over -24 h to +72 h around time zero in all three cohorts.
 
-The outcome runs on the same clock. A 28-day death is a death on or before the 28th calendar
-day after the day of time zero; survival time is counted from time zero, with a death on that
-same day set to 0.5 days rather than 0; and patients whose death date precedes that day are
-excluded from the cohort.
-
 ## Requirements
 
 - PostgreSQL with the three databases loaded under the schema names used in the SQL files
