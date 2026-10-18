@@ -171,7 +171,7 @@ CREATE TEMP TABLE st_s2 AS SELECT COUNT(*)::int AS n FROM derived.sepsis_cohort;
 
 DROP TABLE IF EXISTS st_cohort;
 CREATE TEMP TABLE st_cohort AS
-SELECT sc.stay_id, sc.hadm_id
+SELECT sc.stay_id, sc.hadm_id, sc.deathtime
 FROM derived.sepsis_cohort sc
 WHERE sc.admission_age >= 18
   AND sc.icu_los_days >= 1;
